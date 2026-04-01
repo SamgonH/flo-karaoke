@@ -6,7 +6,7 @@
     "node": ">=20.19.0 || >=22.12.0"
   },
   "scripts": {
-    "dev": "cross-env NEXT_PUBLIC_FLO_ENV=dev next dev",
+    "dev": "cross-env NEXT_PUBLIC_FLO_ENV=production next dev",
     "qa": "cross-env NEXT_PUBLIC_FLO_ENV=qa next dev",
     "prod": "cross-env NEXT_PUBLIC_FLO_ENV=prod next dev",
     "build": "cross-env NEXT_PUBLIC_FLO_ENV=dev next build",

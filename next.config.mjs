@@ -50,7 +50,7 @@ const nextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
-              "img-src 'self' data: https://cdn.music-flo.com https://cdnimg.music-flo.com https://image.music-flo.com https://img.music-flo.com https://i.scdn.co",
+              "img-src 'self' data: https://api.dicebear.com https://cdn.music-flo.com https://cdnimg.music-flo.com https://image.music-flo.com https://img.music-flo.com https://i.scdn.co",
               process.env.NEXT_PUBLIC_SUPABASE_URL
                 ? "connect-src 'self' https://cdn.jsdelivr.net https://*.supabase.co wss://*.supabase.co https://*.supabase.in wss://*.supabase.in"
                 : "connect-src 'self' https://cdn.jsdelivr.net",
