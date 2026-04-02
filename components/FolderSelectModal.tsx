@@ -86,9 +86,12 @@ export function FolderSelectModal({
       
       {/* Modal Content */}
       <Card className="relative w-full max-w-[360px] bg-[var(--color-surface-secondary)] rounded-t-[24px] sm:rounded-[24px] flex flex-col max-h-[80vh] animate-in slide-in-from-bottom duration-300 overflow-hidden shadow-2xl">
-        <div className="flex items-center justify-between p-[20px] pb-[10px]">
-          <Heading level={3}>폴더 선택</Heading>
-          <button onClick={onClose} className="p-[4px] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors">
+        <div className="flex items-start justify-between p-[20px] pb-[12px]">
+          <div className="flex flex-col gap-[4px]">
+            <Heading level={3}>📁 폴더 선택</Heading>
+            <DetailText className="text-[var(--color-text-tertiary)] !text-[12px]">담거나 뺄 폴더를 골라주세요</DetailText>
+          </div>
+          <button onClick={onClose} className="p-[4px] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors mt-[2px]">
             <svg className="size-[24px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -96,7 +99,6 @@ export function FolderSelectModal({
         </div>
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-[20px] pt-0 scrollbar-hide">
-          <DetailText className="mb-[16px] text-[var(--color-text-tertiary)] text-center">곡을 저장하거나 뺄 폴더를 골라주세요.</DetailText>
           
           {isLoading ? (
             <div className="flex justify-center py-[40px]">

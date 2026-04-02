@@ -27,11 +27,11 @@ import { incrementSongStat, getPopularSongs, searchKaraokeSongs } from '@/db/kar
 import { logAction } from '@/utils/floLog'
 
 const MOCK_FLO_KINGS = [
-  { id: '1', name: '홍대 감성남', song: '다이너마이트', views: '1.2M', likes: '12만', img: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=200&auto=format&fit=crop', videoTime: '1:02', badge: '🔥 급상승' },
-  { id: '2', name: '코인노래방 고인물', song: 'Tears', views: '980K', likes: '9.8만', img: 'https://images.unsplash.com/photo-1516280440502-601ce838202d?q=80&w=200&auto=format&fit=crop', videoTime: '0:58', badge: '👑 1위' },
-  { id: '3', name: '방구석 디바', song: '사건의 지평선', views: '850K', likes: '6.5만', img: 'https://images.unsplash.com/photo-1521337581100-8ca9a73a5f79?q=80&w=200&auto=format&fit=crop', videoTime: '1:15', badge: '✨ NEW' },
-  { id: '4', name: '출근길 스웨거', song: 'Hype Boy', views: '640K', likes: '5.1만', img: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?q=80&w=200&auto=format&fit=crop', videoTime: '0:45', badge: '📈 인기' },
-  { id: '5', name: '노래하는 야옹이', song: '에필로그', views: '520K', likes: '4.8만', img: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=Cat', videoTime: '1:30', badge: '🥺 감동' },
+  { id: '1', memberNo: 'user-001', name: '홍대 감성남', song: '다이너마이트', videoTitle: '지하철 파업이라 걸어오다 부른 다이너마이트🔥', tags: ['#출근길', '#팝송장인', '#흥폭발'], views: '1.2M', likes: '12만', img: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=200&auto=format&fit=crop', videoTime: '1:02', badge: '🔥 급상승' },
+  { id: '2', memberNo: 'user-002', name: '코인노래방 고인물', song: 'Tears', videoTitle: '코노에서 Tears 원키로 뽑아봄 (실제상황)', tags: ['#원키', '#소찬휘', '#고음병'], views: '980K', likes: '9.8만', img: 'https://images.unsplash.com/photo-1516280440502-601ce838202d?q=80&w=200&auto=format&fit=crop', videoTime: '0:58', badge: '👑 1위' },
+  { id: '3', memberNo: 'user-003', name: '방구석 디바', song: '사건의 지평선', videoTitle: '방구석에서 부르는 사건의 지평선 커버', tags: ['#윤하', '#음색깡패', '#새벽감성'], views: '850K', likes: '6.5만', img: 'https://images.unsplash.com/photo-1521337581100-8ca9a73a5f79?q=80&w=200&auto=format&fit=crop', videoTime: '1:15', badge: '✨ NEW' },
+  { id: '4', memberNo: 'user-004', name: '출근길 스웨거', song: 'Hype Boy', videoTitle: '뉴진스의 하입보이요 (퇴근하고 싶다)', tags: ['#뉴진스', '#댄스보컬', '#퇴근길'], views: '640K', likes: '5.1만', img: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?q=80&w=200&auto=format&fit=crop', videoTime: '0:45', badge: '📈 인기' },
+  { id: '5', memberNo: 'user-005', name: '노래하는 야옹이', song: '에필로그', videoTitle: '야옹이가 부르는 에필로그 들어보실래요?', tags: ['#냥이', '#잔잔한', '#에필로그'], views: '520K', likes: '4.8만', img: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=Cat', videoTime: '1:30', badge: '🥺 감동' },
 ]
 
 type RankingCategory = 'ALL' | 'K-POP' | 'POP' | 'J-POP' | 'C-POP' | 'FLO 가왕'
@@ -68,6 +68,14 @@ function KaraokeAppContent() {
   const [showIntro, setShowIntro] = useState(true)
   const [introStep, setIntroStep] = useState(0) // 0: '나의', 1: (🎤), 2: '노래방'
   const [isReelsMode, setIsReelsMode] = useState(false)
+  const [isReelUploadOpen, setIsReelUploadOpen] = useState(false)
+  const [reelUploadTitle, setReelUploadTitle] = useState('')
+  const [reelUploadTags, setReelUploadTags] = useState('')
+  const [reelUploadSongId, setReelUploadSongId] = useState<string | null>(null)
+  const [reelUploadSongTitle, setReelUploadSongTitle] = useState('')
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
+  const [profileNickname, setProfileNickname] = useState('')
+  const [profileAvatar, setProfileAvatar] = useState('')
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -486,7 +494,17 @@ function KaraokeAppContent() {
         {/* Header Hero Area */}
         <div className="relative pt-[100px] pb-[40px] px-[20px] flex flex-col items-center gap-[40px] text-center">
           <div className="flex flex-col gap-[10px]">
-             <Heading level={1} className="!text-[42px] font-black tracking-tighter bg-gradient-to-br from-[var(--color-text-primary)] to-[var(--color-text-tertiary)] bg-clip-text text-transparent">
+             <Heading 
+               level={1} 
+               onClick={() => {
+                 setActiveTab('search');
+                 setSearchQuery('');
+                 setSearchResults([]);
+                 setIsReelsMode(false);
+                 window.scrollTo({ top: 0, behavior: 'smooth' });
+               }}
+               className="!text-[42px] font-black tracking-tighter bg-gradient-to-br from-[var(--color-text-primary)] to-[var(--color-text-tertiary)] bg-clip-text text-transparent cursor-pointer hover:opacity-80 active:scale-95 transition-all select-none pb-[2px]"
+             >
                나의 <span className="inline-block hover:scale-110 transition-transform">🎤</span> 노래방
              </Heading>
              <DetailText className="text-[var(--color-text-tertiary)] !text-[16px]">오늘 부를 노래의 번호를 찾아보세요!</DetailText>
@@ -613,7 +631,51 @@ function KaraokeAppContent() {
                 ))}
               </div>
               <div className="flex flex-col p-[12px] bg-white/40 backdrop-blur-xl rounded-[32px] border border-white/50 shadow-sm mt-[10px]">
-                {popularSongs.length > 0 ? popularSongs.map((song, index) => (
+                {rankingCategory === 'FLO 가왕' ? (
+                  <div className="flex flex-col gap-[12px] p-[8px]">
+                    <div className="flex items-center gap-[8px] mb-[4px]">
+                      <span className="px-[12px] py-[4px] bg-black text-yellow-400 rounded-full text-[12px] font-black">👑 FLO 가왕 인기 차트</span>
+                      <span className="text-[11px] text-[var(--color-text-tertiary)] font-bold">실시간 업데이트</span>
+                    </div>
+                    {MOCK_FLO_KINGS.map((king, index) => (
+                      <div 
+                        key={king.id}
+                        onClick={() => setIsReelsMode(true)}
+                        className="flex items-center gap-[14px] p-[12px] bg-white rounded-[20px] border border-[var(--color-border)] hover:border-[var(--color-static-accent)] hover:shadow-md transition-all cursor-pointer group active:scale-[0.98]"
+                      >
+                        <div className="w-[32px] text-center font-black text-[20px] italic shrink-0">
+                          {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : <span className="text-[var(--color-text-tertiary)] text-[16px]">{index + 1}</span>}
+                        </div>
+                        <div className="size-[56px] rounded-[14px] overflow-hidden shrink-0 shadow-md">
+                          <img src={king.img} alt={king.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                        </div>
+                        <div className="flex flex-col flex-1 min-w-0 gap-[2px]">
+                          <span className="font-black text-[14px] text-[var(--color-text-primary)] truncate">{king.videoTitle}</span>
+                          <span className="text-[12px] font-bold text-[var(--color-text-secondary)]">🎵 {king.song}</span>
+                          <div className="flex gap-[4px] flex-wrap mt-[2px]">
+                            {king.tags.slice(0,2).map(tag => (
+                              <span key={tag} className="text-[10px] font-bold text-[var(--color-static-accent)]">{tag}</span>
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-[10px] mt-[2px]">
+                            <span className="text-[11px] text-[var(--color-text-tertiary)] font-bold">👁 {king.views}</span>
+                            <span className="text-[11px] text-pink-500 font-bold">♥ {king.likes}</span>
+                          </div>
+                        </div>
+                        <div className="shrink-0">
+                          <span className="px-[10px] py-[4px] bg-gradient-to-r from-pink-500 to-purple-600 text-white text-[10px] font-black rounded-full">{king.badge}</span>
+                        </div>
+                      </div>
+                    ))}
+                    <button 
+                      onClick={() => setIsReelsMode(true)}
+                      className="w-full mt-[8px] py-[14px] rounded-[20px] bg-black text-yellow-400 font-black text-[14px] flex items-center justify-center gap-[8px] hover:scale-[1.01] active:scale-95 transition-all shadow-lg"
+                    >
+                      <svg className="size-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4" /></svg>
+                      FLO 가왕 피드에서 전체 보기 →
+                    </button>
+                  </div>
+                ) : popularSongs.length > 0 ? popularSongs.map((song, index) => (
                   <div key={song.id} className="flex items-center">
                     <div className="w-[36px] text-center font-black text-[var(--color-text-tertiary)] italic text-[18px] pr-[4px]">{index + 1}</div>
                     <div className="flex-1">
@@ -854,22 +916,162 @@ function KaraokeAppContent() {
 
               {/* 하단 메타 데이터 */}
               <div className="absolute bottom-[40px] left-[20px] right-[100px] flex flex-col gap-[8px] z-10">
-                <div className="flex items-center gap-[8px] mb-[4px]">
-                  <span className="px-[14px] py-[6px] bg-gradient-to-r from-pink-500 to-purple-600 rounded-full text-[12px] font-black text-white shadow-lg border border-white/20">{king.badge}</span>
-                  <div className="flex items-center gap-[6px] bg-black/50 px-[12px] py-[6px] rounded-full backdrop-blur-md border border-white/10">
-                    <svg className="size-[14px] text-white/90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                    <span className="text-[12px] font-bold text-white/90">{king.views}</span>
+                <div className="flex flex-col gap-[4px]">
+                  <Heading level={2} className="!text-[28px] font-[900] text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)] leading-tight">{king.videoTitle}</Heading>
+                  <div className="flex flex-wrap gap-[6px]">
+                    {king.tags.map(tag => (
+                      <span key={tag} className="text-[12px] font-bold text-yellow-400 drop-shadow-md">{tag}</span>
+                    ))}
                   </div>
                 </div>
-                <Heading level={2} className="!text-[36px] font-[900] text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)] leading-tight">{king.song}</Heading>
-                <div className="flex items-center gap-[8px] mt-[4px]">
-                  <div className="size-[32px] rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white border border-white/30 text-[14px]">🎧</div>
-                  <DetailText className="!text-[18px] font-bold text-white/90 drop-shadow-lg">@{king.name}</DetailText>
+
+                <div 
+                  className="flex items-center gap-[8px] mt-[10px] cursor-pointer group/profile active:scale-95 transition-transform"
+                  onClick={() => {
+                    // 유저 프로필로 이동 (여기서는 해당 유저의 폴더 리스트 혹은 단순 프로필 노출로 시뮬레이션)
+                    setIsReelsMode(false);
+                    setActiveTab('favorites');
+                    // 실제 구현 시 해당 유저 번호로 데이터 필터링 로직 필요
+                    alert(`실제 서비스에서는 @${king.name}님의 노래방으로 이동합니다!`);
+                  }}
+                >
+                  <div className="size-[36px] rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white border border-white/30 text-[14px]">🎧</div>
+                  <DetailText className="!text-[18px] font-bold text-white/90 drop-shadow-lg group-hover/profile:text-white transition-colors">@{king.name}</DetailText>
+                  <div className="px-[8px] py-[2px] bg-white/20 backdrop-blur-md rounded-full text-[10px] text-white/80 font-bold border border-white/10 uppercase tracking-tighter">Follow</div>
                 </div>
-                <DetailText className="!text-[14px] font-medium text-white/70 drop-shadow-md truncate mt-[8px]">🎶 오리지널 사운드 - {king.name} 커버 직캠 모음집</DetailText>
+                
+                <div className="flex items-center gap-[8px] mt-[12px] bg-white/10 backdrop-blur-md px-[12px] py-[8px] rounded-xl border border-white/10 w-fit">
+                   <svg className="size-[16px] text-white/70" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                   <DetailText className="!text-[13px] font-medium text-white/90 drop-shadow-md truncate">오리지널 사운드 - {king.song}</DetailText>
+                </div>
+              </div>
+
+              {/* 하단 중앙 기능 버튼 (업로드 버튼) */}
+              <div className="absolute bottom-[30px] left-1/2 -translate-x-1/2 z-20">
+                <button 
+                  onClick={() => setIsReelUploadOpen(true)}
+                  className="px-[24px] py-[14px] bg-gradient-to-r from-[#8E2DE2] to-[#4A00E0] text-white rounded-full font-black text-[15px] shadow-[0_10px_30px_rgba(142,45,226,0.6)] border border-white/30 hover:scale-105 active:scale-95 transition-all flex items-center gap-[8px]"
+                >
+                  <svg className="size-[20px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
+                  내 노래 업로드 하기!
+                </button>
               </div>
             </div>
           ))}
+        </div>
+      </div>
+    )}
+
+    {/* ===== 업로드 모달 ===== */}
+    {isReelUploadOpen && (
+      <div className="fixed inset-0 z-[600] bg-black/70 backdrop-blur-sm flex items-end justify-center" onClick={() => setIsReelUploadOpen(false)}>
+        <div 
+          className="w-full max-w-[560px] bg-white rounded-t-[32px] p-[28px] pb-[48px] flex flex-col gap-[20px] animate-in slide-in-from-bottom-full duration-400"
+          onClick={e => e.stopPropagation()}
+        >
+          {/* 핸들 바 */}
+          <div className="w-[48px] h-[4px] bg-[var(--color-border)] rounded-full mx-auto mb-[4px]" />
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-[10px]">
+              <div className="size-[40px] rounded-[14px] bg-gradient-to-br from-[#8E2DE2] to-[#4A00E0] flex items-center justify-center shadow-lg">
+                <svg className="size-[22px] text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+              </div>
+              <div>
+                <Heading level={3} className="!text-[18px] font-black">내 노래 업로드</Heading>
+                <DetailText className="text-[var(--color-text-tertiary)] !text-[12px]">FLO 가왕 피드에 등록됩니다</DetailText>
+              </div>
+            </div>
+            <button onClick={() => setIsReelUploadOpen(false)} className="size-[36px] rounded-full bg-[var(--color-surface-secondary)] flex items-center justify-center text-[var(--color-text-tertiary)] hover:bg-[var(--color-surface-tertiary)] transition-colors text-[18px]">✕</button>
+          </div>
+
+          {/* 곡 이름 - 기존 DB 매칭 필수 */}
+          <div className="flex flex-col gap-[8px]">
+            <label className="text-[13px] font-black text-[var(--color-text-secondary)] uppercase tracking-wider">🎵 곡 이름 <span className="text-red-500">*</span></label>
+            <div className="relative">
+              <input
+                type="text"
+                value={reelUploadSongTitle}
+                onChange={async (e) => {
+                  setReelUploadSongTitle(e.target.value);
+                  setReelUploadSongId(null);
+                  if (e.target.value.length > 1) {
+                    try {
+                      const results = await searchKaraokeSongs(e.target.value);
+                      if (results.length > 0) {
+                        setReelUploadSongId(results[0].id);
+                      }
+                    } catch {}
+                  }
+                }}
+                placeholder="곡명 또는 아티스트 입력 (기존 곡만 가능)"
+                className={`w-full h-[52px] rounded-[16px] px-[18px] pr-[48px] text-[15px] font-medium border-2 focus:outline-none transition-all ${reelUploadSongId ? 'border-green-400 bg-green-50' : 'border-[var(--color-border)] bg-[var(--color-surface-secondary)] focus:border-[var(--color-static-accent)]'}`}
+              />
+              {reelUploadSongId && (
+                <div className="absolute right-[14px] top-1/2 -translate-y-1/2 size-[24px] rounded-full bg-green-400 flex items-center justify-center">
+                  <svg className="size-[14px] text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>
+                </div>
+              )}
+            </div>
+            {reelUploadSongTitle.length > 0 && !reelUploadSongId && (
+              <DetailText className="text-orange-500 !text-[12px] font-bold">⚠️ 일치하는 곡을 찾지 못했어요. 다른 이름으로 검색해 보세요.</DetailText>
+            )}
+            {reelUploadSongId && (
+              <DetailText className="text-green-600 !text-[12px] font-bold">✅ 곡 매칭 완료! 이 곡으로 등록됩니다.</DetailText>
+            )}
+          </div>
+
+          {/* 영상 제목 */}
+          <div className="flex flex-col gap-[8px]">
+            <label className="text-[13px] font-black text-[var(--color-text-secondary)] uppercase tracking-wider">🎬 영상 제목</label>
+            <input
+              type="text"
+              value={reelUploadTitle}
+              onChange={e => setReelUploadTitle(e.target.value)}
+              placeholder="예: 코노에서 즉흥으로 불러봄 ㅋㅋ"
+              maxLength={60}
+              className="w-full h-[52px] rounded-[16px] px-[18px] text-[15px] font-medium border-2 border-[var(--color-border)] bg-[var(--color-surface-secondary)] focus:outline-none focus:border-[var(--color-static-accent)] transition-all"
+            />
+            <DetailText className="text-right text-[var(--color-text-tertiary)] !text-[11px]">{reelUploadTitle.length}/60</DetailText>
+          </div>
+
+          {/* 태그 */}
+          <div className="flex flex-col gap-[8px]">
+            <label className="text-[13px] font-black text-[var(--color-text-secondary)] uppercase tracking-wider">🏷️ 태그 <span className="text-[var(--color-text-tertiary)] font-normal normal-case">(쉼표로 구분)</span></label>
+            <input
+              type="text"
+              value={reelUploadTags}
+              onChange={e => setReelUploadTags(e.target.value)}
+              placeholder="#팝송, #고음, #코인노래방"
+              className="w-full h-[52px] rounded-[16px] px-[18px] text-[15px] font-medium border-2 border-[var(--color-border)] bg-[var(--color-surface-secondary)] focus:outline-none focus:border-[var(--color-static-accent)] transition-all"
+            />
+            {reelUploadTags && (
+              <div className="flex flex-wrap gap-[6px] mt-[4px]">
+                {reelUploadTags.split(',').map(t => t.trim()).filter(Boolean).map(tag => (
+                  <span key={tag} className="px-[10px] py-[4px] rounded-full bg-[var(--color-static-accent)]/10 text-[var(--color-static-accent)] text-[12px] font-bold border border-[var(--color-static-accent)]/20">
+                    {tag.startsWith('#') ? tag : `#${tag}`}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 제출 버튼 */}
+          <button
+            disabled={!reelUploadSongId}
+            onClick={() => {
+              if (!reelUploadSongId) return;
+              alert(`🎉 업로드 완료!\n제목: ${reelUploadTitle || '(제목 없음)'}\n태그: ${reelUploadTags}\n\n실제 서비스에서는 영상 파일도 함께 업로드됩니다!`);
+              setIsReelUploadOpen(false);
+              setReelUploadTitle('');
+              setReelUploadTags('');
+              setReelUploadSongId(null);
+              setReelUploadSongTitle('');
+            }}
+            className="w-full h-[60px] rounded-[20px] bg-gradient-to-r from-[#8E2DE2] to-[#4A00E0] text-white font-black text-[18px] shadow-[0_10px_30px_rgba(142,45,226,0.4)] hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:scale-100"
+          >
+            {reelUploadSongId ? '🎤 FLO 가왕 피드에 올리기!' : '곡을 먼저 선택해주세요'}
+          </button>
         </div>
       </div>
     )}

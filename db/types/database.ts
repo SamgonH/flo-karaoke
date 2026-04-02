@@ -78,129 +78,81 @@ export type Database = {
           },
         ]
       }
-      folders: {
+      flo_reels: {
         Row: {
           created_at: string | null
           id: string
-          member_no: string
-          name: string
-          is_shared: boolean
-          share_key: string | null
-          invitation_message: string | null
-          cover_url: string | null
+          likes: number | null
+          song_id: string
+          tags: string[] | null
+          thumbnail_url: string | null
+          uploader_id: string
+          video_title: string
+          video_url: string | null
+          views: number | null
         }
         Insert: {
           created_at?: string | null
           id?: string
-          member_no: string
-          name: string
-          is_shared?: boolean
-          share_key?: string | null
-          invitation_message?: string | null
-          cover_url?: string | null
+          likes?: number | null
+          song_id: string
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          uploader_id: string
+          video_title: string
+          video_url?: string | null
+          views?: number | null
         }
         Update: {
           created_at?: string | null
           id?: string
-          member_no?: string
-          name?: string
-          is_shared?: boolean
-          share_key?: string | null
-          invitation_message?: string | null
-          cover_url?: string | null
+          likes?: number | null
+          song_id?: string
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          uploader_id?: string
+          video_title?: string
+          video_url?: string | null
+          views?: number | null
         }
-        Relationships: []
-      }
-      karaoke_songs: {
-        Row: {
-          artist: string
-          category: string | null
-          cover_url: string | null
-          created_at: string | null
-          flo_track_id: string | null
-          id: string
-          ky_number: string | null
-          search_keywords: string | null
-          title: string
-          tj_number: string | null
-          search_count: number
-          preview_count: number
-          favorite_count: number
-        }
-        Insert: {
-          artist: string
-          category?: string | null
-          cover_url?: string | null
-          created_at?: string | null
-          flo_track_id?: string | null
-          id?: string
-          ky_number?: string | null
-          search_keywords?: string | null
-          title: string
-          tj_number?: string | null
-          search_count?: number
-          preview_count?: number
-          favorite_count?: number
-        }
-        Update: {
-          artist?: string
-          category?: string | null
-          cover_url?: string | null
-          created_at?: string | null
-          flo_track_id?: string | null
-          id?: string
-          ky_number?: string | null
-          search_keywords?: string | null
-          title?: string
-          tj_number?: string | null
-          search_count?: number
-          preview_count?: number
-          favorite_count?: number
-        }
-        Relationships: []
-      }
-      profiles: {
-        Row: {
-          member_no: string
-          nickname: string
-          avatar_url: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          member_no: string
-          nickname: string
-          avatar_url?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          member_no?: string
-          nickname?: string
-          avatar_url?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "flo_reels_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "karaoke_songs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flo_reels_uploader_id_fkey"
+            columns: ["uploader_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["member_no"]
+          },
+        ]
       }
       folder_members: {
         Row: {
+          folder_id: string | null
           id: string
-          folder_id: string
+          joined_at: string | null
           member_no: string
           role: string
-          joined_at: string | null
         }
         Insert: {
+          folder_id?: string | null
           id?: string
-          folder_id: string
+          joined_at?: string | null
           member_no: string
           role?: string
-          joined_at?: string | null
         }
         Update: {
+          folder_id?: string | null
           id?: string
-          folder_id?: string
+          joined_at?: string | null
           member_no?: string
           role?: string
-          joined_at?: string | null
         }
         Relationships: [
           {
@@ -216,7 +168,150 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["member_no"]
-          }
+          },
+        ]
+      }
+      folders: {
+        Row: {
+          cover_url: string | null
+          created_at: string | null
+          id: string
+          invitation_message: string | null
+          is_shared: boolean | null
+          member_no: string
+          name: string
+          share_key: string | null
+        }
+        Insert: {
+          cover_url?: string | null
+          created_at?: string | null
+          id?: string
+          invitation_message?: string | null
+          is_shared?: boolean | null
+          member_no: string
+          name: string
+          share_key?: string | null
+        }
+        Update: {
+          cover_url?: string | null
+          created_at?: string | null
+          id?: string
+          invitation_message?: string | null
+          is_shared?: boolean | null
+          member_no?: string
+          name?: string
+          share_key?: string | null
+        }
+        Relationships: []
+      }
+      karaoke_songs: {
+        Row: {
+          artist: string
+          category: string | null
+          cover_url: string | null
+          created_at: string | null
+          favorite_count: number | null
+          flo_track_id: string | null
+          id: string
+          ky_number: string | null
+          preview_count: number | null
+          search_count: number | null
+          search_keywords: string | null
+          title: string
+          tj_number: string | null
+        }
+        Insert: {
+          artist: string
+          category?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          favorite_count?: number | null
+          flo_track_id?: string | null
+          id?: string
+          ky_number?: string | null
+          preview_count?: number | null
+          search_count?: number | null
+          search_keywords?: string | null
+          title: string
+          tj_number?: string | null
+        }
+        Update: {
+          artist?: string
+          category?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          favorite_count?: number | null
+          flo_track_id?: string | null
+          id?: string
+          ky_number?: string | null
+          preview_count?: number | null
+          search_count?: number | null
+          search_keywords?: string | null
+          title?: string
+          tj_number?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          member_no: string
+          nickname: string
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          member_no: string
+          nickname: string
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          member_no?: string
+          nickname?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      song_metadata_overrides: {
+        Row: {
+          cover_url: string | null
+          created_at: string
+          flo_track_id: string | null
+          id: string
+          is_active: boolean
+          note: string | null
+          song_id: string
+          updated_at: string
+        }
+        Insert: {
+          cover_url?: string | null
+          created_at?: string
+          flo_track_id?: string | null
+          id?: string
+          is_active?: boolean
+          note?: string | null
+          song_id: string
+          updated_at?: string
+        }
+        Update: {
+          cover_url?: string | null
+          created_at?: string
+          flo_track_id?: string | null
+          id?: string
+          is_active?: boolean
+          note?: string | null
+          song_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "song_metadata_overrides_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: true
+            referencedRelation: "karaoke_songs"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -224,7 +319,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_song_stat: {
+        Args: { song_id: string; stat_type: string }
+        Returns: undefined
+      }
+      normalize_karaoke_text: { Args: { input_text: string }; Returns: string }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      strip_spaces: { Args: { "": string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
