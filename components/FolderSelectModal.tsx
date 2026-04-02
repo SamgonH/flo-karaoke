@@ -5,15 +5,7 @@ import { BodyText, DetailText, Heading } from './ui/Text'
 import { Card } from './ui/Card'
 import { Button } from './ui/Button'
 import { Spinner } from './ui/Spinner'
-import { getFolders, createFolder } from '@/db/folders'
-
-interface FolderRow {
-  id: string
-  name: string
-  member_no: string
-  is_shared: boolean
-  created_at: string | null
-}
+import { getFolders, createFolder, type FolderRow } from '@/db/folders'
 
 interface FolderSelectModalProps {
   memberNo: string
@@ -22,6 +14,7 @@ interface FolderSelectModalProps {
   onSelect: (folderId: string) => void
   onFolderCreated?: () => void
   defaultShared?: boolean
+  currentFolderIds: string[]
 }
 
 export function FolderSelectModal({ 
@@ -30,7 +23,8 @@ export function FolderSelectModal({
   onClose, 
   onSelect, 
   onFolderCreated,
-  defaultShared = false 
+  defaultShared = false,
+  currentFolderIds = []
 }: FolderSelectModalProps) {
   const [folders, setFolders] = useState<FolderRow[]>([])
   const [newFolderName, setNewFolderName] = useState('')
@@ -102,7 +96,7 @@ export function FolderSelectModal({
         </div>
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-[20px] pt-0 scrollbar-hide">
-          <DetailText className="mb-[16px] text-[var(--color-text-tertiary)] text-center">곡을 저장할 폴더를 골라주세요.</DetailText>
+          <DetailText className="mb-[16px] text-[var(--color-text-tertiary)] text-center">곡을 저장하거나 뺄 폴더를 골라주세요.</DetailText>
           
           {isLoading ? (
             <div className="flex justify-center py-[40px]">
@@ -110,23 +104,34 @@ export function FolderSelectModal({
             </div>
           ) : (
             <div className="flex flex-col gap-[8px]">
-              {folders.map((folder) => (
-                <button
-                  key={folder.id}
-                  onClick={() => onSelect(folder.id)}
-                  className="flex items-center justify-between p-[14px] bg-[var(--color-surface-bg)] rounded-[14px] hover:bg-[var(--color-surface-tertiary)] active:scale-[0.98] transition-all border border-[var(--color-border)] text-left"
-                >
-                  <div className="flex items-center gap-[6px] flex-1 truncate">
-                    <BodyText className="truncate">{folder.name}</BodyText>
-                    {folder.is_shared && (
-                      <span className="shrink-0 text-[12px] bg-[var(--color-static-accent)] text-white px-[4px] py-[1px] rounded-[4px] font-bold">👥</span>
+              {folders.map((folder) => {
+                const isIncluded = currentFolderIds.includes(folder.id)
+                return (
+                  <button
+                    key={folder.id}
+                    onClick={() => onSelect(folder.id)}
+                    className={`flex items-center justify-between p-[14px] rounded-[14px] active:scale-[0.98] transition-all border text-left ${isIncluded ? 'bg-white shadow-sm border-[var(--color-static-accent)]' : 'bg-[var(--color-surface-bg)] border-[var(--color-border)] hover:bg-[var(--color-surface-tertiary)]'}`}
+                  >
+                    <div className="flex items-center gap-[6px] flex-1 truncate">
+                      <BodyText className={`truncate ${isIncluded ? 'text-[var(--color-static-accent)] font-bold' : ''}`}>{folder.name}</BodyText>
+                      {folder.is_shared && (
+                        <span className="shrink-0 text-[12px] bg-[var(--color-static-accent)] text-white px-[4px] py-[1px] rounded-[4px] font-bold">👥</span>
+                      )}
+                    </div>
+                    {isIncluded ? (
+                      <div className="size-[20px] bg-[var(--color-static-accent)] rounded-full flex items-center justify-center animate-in zoom-in duration-200">
+                        <svg className="size-[12px] text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    ) : (
+                      <svg className="size-[18px] text-[var(--color-icon-tertiary)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
                     )}
-                  </div>
-                  <svg className="size-[18px] text-[var(--color-icon-tertiary)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              ))}
+                  </button>
+                )
+              })}
 
               {/* 새 폴더 생성 영역 */}
               <div className="mt-[16px] pt-[16px] border-t border-[var(--color-border)] flex flex-col gap-[10px]">

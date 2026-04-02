@@ -120,13 +120,13 @@ export function SearchResultItem({
           className="p-[4px] -m-[4px] focus:outline-none transition-transform active:scale-90"
         >
           <svg
-            className={`size-[22px] ${isFavorite ? 'text-[#FFD700]' : 'text-[var(--color-icon-disabled)]'}`}
+            className={`size-[22px] transition-all duration-300 ${isFavorite ? 'text-[var(--color-static-accent)] drop-shadow-[0_0_8px_rgba(var(--color-static-accent-rgb),0.6)] scale-110' : 'text-[var(--color-icon-disabled)] opacity-40'}`}
             fill={isFavorite ? 'currentColor' : 'none'}
             viewBox="0 0 24 24"
             stroke="currentColor"
             strokeWidth={1.5}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0-1.242 1.008-2.25 2.25-2.25h3.375c.621 0 1.125.504 1.125 1.125v1.312c0 .621.504 1.125 1.125 1.125H18c1.242 0 2.25 1.008 2.25 2.25V18c0 1.242-1.008 2.25-2.25 2.25H4.5A2.25 2.25 0 012.25 18V6.75z" />
           </svg>
         </button>
 

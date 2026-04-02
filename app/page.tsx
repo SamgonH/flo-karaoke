@@ -19,7 +19,7 @@ import {
   getFavoriteSongsByFolder,
   getFavoriteSongsByUser,
   addFavoriteSong, 
-  removeFavoriteSong,
+  removeFavoriteSongByFolder,
 } from '@/db/favorites'
 import { getFolderMembers } from '@/db/folder_members'
 import { incrementSongStat, getPopularSongs, searchKaraokeSongs } from '@/db/karaokeSongs'
@@ -37,7 +37,7 @@ function KaraokeAppContent() {
   const [recentSearches, setRecentSearches] = useState<string[]>([])
   const [folders, setFolders] = useState<any[]>([])
   const [favoriteSongs, setFavoriteSongs] = useState<Song[]>([])
-  const [favMap, setFavMap] = useState<Record<string, string>>({}) // songId -> favoriteId
+  const [favMap, setFavMap] = useState<Record<string, string[]>>({}) // songId -> folderIds[]
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
   const [folderMembers, setFolderMembers] = useState<any[]>([])
   const [playingSongId, setPlayingSongId] = useState<string | null>(null)
@@ -54,6 +54,9 @@ function KaraokeAppContent() {
   const [activeMenuFolderId, setActiveMenuFolderId] = useState<string | null>(null)
   const [memberNo, setMemberNo] = useState<string>('')
 
+  const [showIntro, setShowIntro] = useState(true)
+  const [introStep, setIntroStep] = useState(0) // 0: '나의', 1: (🎤), 2: '노래방'
+
   useEffect(() => {
     let id = localStorage.getItem('KARAOKE_MEMBER_NO')
     if (!id) {
@@ -61,6 +64,11 @@ function KaraokeAppContent() {
       localStorage.setItem('KARAOKE_MEMBER_NO', id)
     }
     setMemberNo(id)
+
+    // 애니메이션 시퀀스
+    setTimeout(() => setIntroStep(1), 800)
+    setTimeout(() => setIntroStep(2), 1600)
+    setTimeout(() => setShowIntro(false), 3000)
   }, [])
 
   useEffect(() => {
@@ -100,14 +108,21 @@ function KaraokeAppContent() {
       })))
 
       const allFavs = await getFavoriteSongsByUser(memberNo)
-      const map: Record<string, string> = {}
-      allFavs.forEach((item: any) => { map[item.song_id] = item.id })
+      const map: Record<string, string[]> = {}
+      allFavs.forEach((item: any) => { 
+        if (!map[item.song_id]) map[item.song_id] = []
+        map[item.song_id].push(item.folder_id) 
+      })
       setFavMap(map)
 
       const covers: Record<string, string[]> = {}
       for (const folder of folderList) {
         const songs = await getFavoriteSongsByFolder(folder.id)
-        covers[folder.id] = songs.slice(0, 4).map((s: any) => s.karaoke_songs.cover_url || '')
+        // karaoke_songs가 null인 경우를 대비해 안전하게 커버 URL 추출
+        covers[folder.id] = songs
+          .filter((s: any) => s.karaoke_songs)
+          .slice(0, 4)
+          .map((s: any) => s.karaoke_songs.cover_url || '')
       }
       setFolderCoversMap(covers)
     } catch (err) {
@@ -131,19 +146,31 @@ function KaraokeAppContent() {
     localStorage.setItem('recentSearches', JSON.stringify(updated))
   }
 
-  const handleSearch = async (e?: React.FormEvent) => {
+  const handleDeleteRecentSearch = (query: string, e: React.MouseEvent) => {
+    e.stopPropagation() // 검색 이벤트 전파 방지
+    const updated = recentSearches.filter(q => q !== query)
+    setRecentSearches(updated)
+    localStorage.setItem('recentSearches', JSON.stringify(updated))
+  }
+
+  const handleSearch = async (e?: React.FormEvent, overrideQuery?: string) => {
     if (e) e.preventDefault()
-    if (!searchQuery.trim()) return
+    const targetQuery = overrideQuery || searchQuery
+    if (!targetQuery.trim()) return
+    
+    setActiveTab('search')
     setIsLoading(true)
-    saveRecentSearch(searchQuery)
+    saveRecentSearch(targetQuery)
+    if (overrideQuery) setSearchQuery(overrideQuery)
+
     try {
-      const results = await searchKaraokeSongs(searchQuery)
+      const results = await searchKaraokeSongs(targetQuery)
       setSearchResults(results.map((t: any) => ({
         id: t.id, title: t.title, artist: t.artist, coverUrl: t.cover_url || '',
         floTrackId: t.flo_track_id ? String(t.flo_track_id) : undefined,
         tjNumber: t.tj_number || undefined, kyNumber: t.ky_number || undefined,
       })))
-      logAction.searchSongs(searchQuery)
+      logAction.searchSongs(targetQuery)
     } catch (err) {
       console.error('검색 실패:', err)
     } finally {
@@ -151,47 +178,49 @@ function KaraokeAppContent() {
     }
   }
 
-  const handleToggleFavorite = (song: Song) => {
-    const favoriteId = favMap[song.id]
-    if (favoriteId) {
-      removeFavoriteSong(favoriteId).then(() => {
-        setFavMap(prev => {
-          const next = { ...prev }
-          delete next[song.id]
-          return next
-        })
-        logAction.favorite(song.id, song.title, false)
-        if (activeTab === 'favorites') {
-          if (isAllSongsMode) handleViewAllSongs()
-          else loadFavoritesByFolder()
-        }
-      })
-    } else {
-      setSongToFavorite(song)
-      setIsSharedMode(false)
-      setIsFolderModalOpen(true)
-    }
+  const handleToggleFavorite = (song: Song, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    if (!memberNo) return
+    setSongToFavorite(song)
+    setIsSharedMode(false)
+    setIsFolderModalOpen(true)
   }
 
   const handleSelectFolder = async (folderId: string) => {
-    if (!memberNo) return
+    if (!memberNo || !songToFavorite) return
     try {
-      if (songToFavorite) {
-        const newFav = await addFavoriteSong(folderId, songToFavorite.id, memberNo)
+      const currentInFolders = favMap[songToFavorite.id] || []
+      const isAlreadyIn = currentInFolders.includes(folderId)
+
+      if (isAlreadyIn) {
+        // 이미 담겨있으면 제거
+        await removeFavoriteSongByFolder(folderId, songToFavorite.id)
+        setFavMap(prev => ({
+          ...prev,
+          [songToFavorite.id]: (prev[songToFavorite.id] || []).filter(id => id !== folderId)
+        }))
+        logAction.favorite(songToFavorite.id, songToFavorite.title, false, folders.find(f => f.id === folderId)?.name)
+      } else {
+        // 없으면 추가
+        await addFavoriteSong(folderId, songToFavorite.id, memberNo)
         incrementSongStat(songToFavorite.id, 'favorite')
-        const folderName = folders.find(f => f.id === folderId)?.name || '알 수 없는 폴더'
-        logAction.favorite(songToFavorite.id, songToFavorite.title, true, folderName)
-        setFavMap(prev => ({ ...prev, [songToFavorite.id]: newFav.id }))
-        if (activeTab === 'favorites') {
-          if (isAllSongsMode) handleViewAllSongs()
-          else loadFavoritesByFolder()
-        }
+        setFavMap(prev => ({
+          ...prev,
+          [songToFavorite.id]: [...(prev[songToFavorite.id] || []), folderId]
+        }))
+        logAction.favorite(songToFavorite.id, songToFavorite.title, true, folders.find(f => f.id === folderId)?.name)
       }
+
+      // 화면 즉시 갱신 (리스트 모드일 때)
+      if (activeTab === 'favorites') {
+        if (isAllSongsMode) handleViewAllSongs()
+        else loadFavoritesByFolder()
+      }
+      
+      // 커버 이미지 갱신 등이 필요할 수 있으므로 loadInitialData 호출
       await loadInitialData()
-      setIsFolderModalOpen(false)
-      setSongToFavorite(null)
     } catch (err) {
-      console.error('폴더 선택 작업 실패:', err)
+      console.error('폴더 작업 실패:', err)
     }
   }
 
@@ -244,7 +273,9 @@ function KaraokeAppContent() {
       const base64 = reader.result as string
       try {
         await updateFolderCover(folderId, base64)
-        loadInitialData()
+        // 즉시 반영을 위해 로컬 상태 업데이트 후 재로드
+        await loadInitialData()
+        alert('폴더 커버가 업데이트되었습니다! 🎉')
       } catch (err) {
         console.error('커버 업데이트 실패:', err)
       }
@@ -336,6 +367,19 @@ function KaraokeAppContent() {
             >
               📝 이름 수정
             </button>
+            {folder.is_shared && (
+              <button 
+                type="button"
+                onClick={() => {
+                  setSelectedFolderId(folder.id);
+                  setIsShareModalOpen(true);
+                  setActiveMenuFolderId(null);
+                }}
+                className="w-full px-[18px] py-[12px] text-left text-[14px] font-[900] text-[var(--color-static-accent)] hover:bg-[var(--color-static-accent)]/5 transition-colors cursor-pointer"
+              >
+                🔗 링크 공유
+              </button>
+            )}
             <div className="h-[1px] bg-[var(--color-border)] mx-[12px] opacity-50" />
             <button 
               type="button"
@@ -353,60 +397,144 @@ function KaraokeAppContent() {
   const selectedFolder = folders.find(f => f.id === selectedFolderId)
 
   return (
-    <main className="min-h-screen bg-[var(--color-surface-bg)] text-[var(--color-text-primary)] pb-[100px]">
-      <header className="sticky top-0 z-50 bg-[var(--color-surface-bg)] border-b border-[var(--color-border)] px-[20px] pt-[40px] pb-[16px]">
-        <div className="max-w-[600px] mx-auto">
-          <Heading level={1} className="mb-[20px]">나의 노래방</Heading>
-          <div className="flex gap-[20px]">
-            {(['search', 'rank', 'favorites'] as const).map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)} className={`pb-[8px] text-[18px] font-bold transition-colors ${activeTab === tab ? 'text-[var(--color-text-primary)] border-b-2 border-[var(--color-text-primary)]' : 'text-[var(--color-text-tertiary)]'}`}>
-                {tab === 'search' ? '찾기' : tab === 'rank' ? '인기차트' : '내 폴더'}
+    <main className="min-h-screen bg-[var(--color-surface-bg)] text-[var(--color-text-primary)] pb-[100px] overflow-x-hidden">
+      {/* Intro Landing Overlay */}
+      {showIntro && (
+        <div className="fixed inset-0 z-[200] bg-[var(--color-surface-bg)] flex items-center justify-center overflow-hidden">
+          <div className="flex flex-col items-center gap-[40px] animate-in fade-in duration-700">
+             <div className="flex items-center gap-[12px]">
+               <h1 className={`text-[48px] font-black transition-all duration-700 ${introStep >= 0 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                 나의
+               </h1>
+               <div className={`size-[80px] bg-gradient-to-br from-[#8E2DE2] to-[#4A00E0] rounded-[24px] flex items-center justify-center text-[40px] shadow-[0_0_40px_rgba(142,45,226,0.5)] transition-all duration-700 ${introStep >= 1 ? 'opacity-100 scale-100 rotate-12' : 'opacity-0 scale-50 rotate-0'}`}>
+                 🎤
+               </div>
+               <h1 className={`text-[48px] font-black transition-all duration-700 ${introStep >= 2 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                 노래방
+               </h1>
+             </div>
+             <div className={`h-[4px] bg-gradient-to-r from-transparent via-[var(--color-static-accent)] to-transparent transition-all duration-1000 ${introStep >= 2 ? 'w-[300px] opacity-100' : 'w-0 opacity-0'}`} />
+          </div>
+        </div>
+      )}
+
+      {/* Main UI */}
+      <div className={`flex flex-col transition-all duration-1000 ${showIntro ? 'opacity-0' : 'opacity-100 animate-in slide-in-from-bottom-10'}`}>
+        {/* Header Hero Area */}
+        <div className="relative pt-[100px] pb-[40px] px-[20px] flex flex-col items-center gap-[40px] text-center">
+          <div className="flex flex-col gap-[10px]">
+             <Heading level={1} className="!text-[42px] font-black tracking-tighter bg-gradient-to-br from-[var(--color-text-primary)] to-[var(--color-text-tertiary)] bg-clip-text text-transparent">
+               나의 <span className="inline-block hover:scale-110 transition-transform">🎤</span> 노래방
+             </Heading>
+             <DetailText className="text-[var(--color-text-tertiary)] !text-[16px]">오늘 부를 노래의 번호를 찾아보세요!</DetailText>
+          </div>
+
+          {/* Centered Search Area (Glass Style) */}
+          <div className="w-full max-w-[500px] relative">
+            <form onSubmit={handleSearch} className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-[#8E2DE2] to-[#4A00E0] rounded-[28px] opacity-20 blur group-focus-within:opacity-40 transition-opacity" />
+              <input 
+                type="text" 
+                value={searchQuery} 
+                onChange={(e) => setSearchQuery(e.target.value)} 
+                placeholder="곡명, 아티스트를 한글로 검색" 
+                className="relative w-full h-[64px] bg-white/80 backdrop-blur-3xl border border-white/40 rounded-[24px] px-[28px] text-[18px] font-medium shadow-2xl focus:outline-none focus:border-[var(--color-static-accent)] transition-all placeholder:text-[var(--color-text-tertiary)]" 
+              />
+              <button type="submit" className="absolute right-[12px] top-[12px] size-[40px] bg-[var(--color-static-accent)] rounded-[16px] text-white flex items-center justify-center shadow-lg active:scale-95 transition-transform">
+                <svg className="size-[20px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              </button>
+            </form>
+            
+            <div className="flex flex-wrap justify-center gap-[10px] mt-[20px]">
+              {recentSearches.map((q, i) => (
+                <div 
+                  key={i} 
+                  onClick={() => handleSearch(undefined, q)} 
+                  className="flex items-center gap-[6px] px-[16px] py-[10px] bg-white/30 backdrop-blur-3xl rounded-full text-[14px] font-bold text-[var(--color-text-secondary)] border border-white/40 hover:bg-white/60 transition-all shadow-sm cursor-pointer group/search"
+                >
+                  <span className="opacity-80 group-hover/search:opacity-100">{q}</span>
+                  <button 
+                    onClick={(e) => handleDeleteRecentSearch(q, e)} 
+                    className="size-[18px] rounded-full hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors text-[10px] opacity-40 hover:opacity-100 border border-transparent hover:border-red-600"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Navigation Tab Cards (Rounded Rect Buttons) */}
+          <div className="flex gap-[16px] mt-[20px]">
+            {([
+              ...(searchResults.length > 0 ? ['search' as const] : []), 
+              'rank' as const, 
+              'favorites' as const
+            ]).map(tab => (
+              <button 
+                key={tab} 
+                onClick={() => { setActiveTab(tab); window.scrollTo({ top: 400, behavior: 'smooth' }); }} 
+                className={`relative group px-[32px] py-[20px] rounded-[28px] border transition-all duration-300 active:scale-95 ${activeTab === tab ? 'bg-white shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] border-white border-[2px] -translate-y-2' : 'bg-transparent border-transparent text-[var(--color-text-tertiary)]'}`}
+              >
+                <div className={`absolute -inset-[2px] bg-gradient-to-br from-[#8E2DE2] to-[#4A00E0] rounded-[30px] opacity-0 ${activeTab === tab ? 'opacity-10' : ''}`} />
+                <div className="flex flex-col items-center gap-[6px]">
+                   <span className="text-[24px]">{tab === 'search' ? '🔍' : tab === 'rank' ? '🔥' : '📁'}</span>
+                   <span className={`text-[15px] font-black tracking-tight ${activeTab === tab ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-tertiary)] group-hover:text-[var(--color-text-secondary)]'}`}>
+                     {tab === 'search' ? '검색 결과' : tab === 'rank' ? '실시간 차트' : '나의 노래방'}
+                   </span>
+                </div>
               </button>
             ))}
           </div>
         </div>
-      </header>
 
-      <div className="max-w-[600px] mx-auto p-[20px]">
-        {activeTab === 'search' && (
-          <div className="flex flex-col gap-[20px]">
-            <form onSubmit={handleSearch} className="relative">
-              <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="곡명, 아티스트 검색" className="w-full bg-[var(--color-surface-secondary)] border border-[var(--color-border)] rounded-[20px] px-[20px] py-[16px] focus:outline-none focus:border-[var(--color-static-accent)]" />
-            </form>
-            <div className="flex flex-wrap gap-[8px]">
-              {recentSearches.map((q, i) => (
-                <button key={i} onClick={() => setSearchQuery(q)} className="px-[12px] py-[6px] bg-[var(--color-surface-tertiary)] rounded-full text-[13px] text-[var(--color-text-secondary)]">{q}</button>
-              ))}
-            </div>
-            <div className="flex flex-col">
-              {isLoading ? <div className="flex justify-center py-[40px]"><Spinner /></div> : searchResults.map(song => (
-                <SearchResultItem key={song.id} song={song} isFavorite={!!favMap[song.id]} isPlaying={playingSongId === song.id} onPlay={() => setPlayingSongId(song.id)} onPause={() => setPlayingSongId(null)} onToggleFavorite={() => handleToggleFavorite(song)} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'rank' && (
-          <div className="flex flex-col gap-[20px]">
-            <div className="flex gap-[10px] overflow-x-auto scrollbar-hide pb-[4px]">
-              {(['ALL', 'K-POP', 'POP', 'J-POP', 'C-POP'] as RankingCategory[]).map(cat => (
-                <button key={cat} onClick={() => setRankingCategory(cat)} className={`shrink-0 px-[16px] py-[8px] rounded-full text-[14px] font-bold border transition-all ${rankingCategory === cat ? 'bg-[var(--color-text-primary)] text-white border-[var(--color-text-primary)] shadow-md' : 'bg-[var(--color-surface-bg)] text-[var(--color-text-tertiary)] border-[var(--color-border)] hover:border-[var(--color-static-accent)]'}`}>
-                  {cat === 'ALL' ? '전체' : cat}
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-col">
-              {popularSongs.length > 0 ? popularSongs.map((song, index) => (
-                <div key={song.id} className="flex items-center">
-                  <div className="w-[40px] text-center font-bold text-[var(--color-text-secondary)]">{index + 1}</div>
-                  <div className="flex-1">
-                    <SearchResultItem song={song} isFavorite={!!favMap[song.id]} isPlaying={playingSongId === song.id} onPlay={() => setPlayingSongId(song.id)} onPause={() => setPlayingSongId(null)} onToggleFavorite={() => handleToggleFavorite(song)} />
+        <div id="content-view" className="max-w-[600px] mx-auto p-[20px] w-full">
+          {activeTab === 'search' && (
+             <div className="animate-in fade-in slide-in-from-bottom-4">
+                {searchResults.length > 0 ? (
+                  <>
+                    <div className="flex items-center gap-[8px] mb-[16px] px-[4px]">
+                       <div className="size-[8px] bg-green-500 rounded-full animate-pulse" />
+                       <DetailText className="font-bold text-[var(--color-static-accent)] uppercase tracking-wider">Search Results</DetailText>
+                    </div>
+                    {isLoading ? <div className="flex justify-center py-[40px]"><Spinner /></div> : searchResults.map(song => (
+                      <SearchResultItem key={song.id} song={song} isFavorite={!!favMap[song.id]?.length} isPlaying={playingSongId === song.id} onPlay={() => setPlayingSongId(song.id)} onPause={() => setPlayingSongId(null)} onToggleFavorite={(s, e) => handleToggleFavorite(s, e)} />
+                    ))}
+                  </>
+                ) : !isLoading && (
+                  <div className="py-[100px] flex flex-col items-center gap-[16px] bg-white/20 backdrop-blur-xl rounded-[40px] border border-white/40 text-center px-[20px]">
+                    <div className="text-[48px] animate-bounce">🔍</div>
+                    <div className="flex flex-col gap-[4px]">
+                      <BodyText className="font-bold !text-[20px]">찾으시는 곡이 없나요?</BodyText>
+                      <DetailText className="text-[var(--color-text-tertiary)] max-w-[200px]">데이터를 더 수집 중이니 조금만 기다려주세요!</DetailText>
+                    </div>
                   </div>
-                </div>
-              )) : <div className="flex justify-center py-[60px]"><Spinner /></div>}
+                )}
+             </div>
+          )}
+
+          {activeTab === 'rank' && (
+            <div className="flex flex-col gap-[20px] animate-in fade-in slide-in-from-bottom-4">
+              {/* Category Subtabs */}
+              <div className="flex gap-[10px] overflow-x-auto scrollbar-hide pb-[4px]">
+                {(['ALL', 'K-POP', 'POP', 'J-POP', 'C-POP'] as RankingCategory[]).map(cat => (
+                  <button key={cat} onClick={() => setRankingCategory(cat)} className={`shrink-0 px-[18px] py-[10px] rounded-[18px] text-[13px] font-black border transition-all ${rankingCategory === cat ? 'bg-white text-[var(--color-text-primary)] border-white shadow-xl scale-105' : 'bg-transparent text-[var(--color-text-tertiary)] border-transparent opacity-60 hover:opacity-100'}`}>
+                    {cat === 'ALL' ? '전체' : cat}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-col p-[12px] bg-white/40 backdrop-blur-xl rounded-[32px] border border-white/50 shadow-sm mt-[10px]">
+                {popularSongs.length > 0 ? popularSongs.map((song, index) => (
+                  <div key={song.id} className="flex items-center">
+                    <div className="w-[36px] text-center font-black text-[var(--color-text-tertiary)] italic text-[18px] pr-[4px]">{index + 1}</div>
+                    <div className="flex-1">
+                      <SearchResultItem song={song} isFavorite={!!favMap[song.id]?.length} isPlaying={playingSongId === song.id} onPlay={() => setPlayingSongId(song.id)} onPause={() => setPlayingSongId(null)} onToggleFavorite={(s, e) => handleToggleFavorite(s, e)} />
+                    </div>
+                  </div>
+                )) : <div className="flex justify-center py-[60px]"><Spinner /></div>}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {activeTab === 'favorites' && (
           <div className="flex flex-col gap-[28px] animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -518,7 +646,15 @@ function KaraokeAppContent() {
                   <div className="flex flex-col items-center gap-[8px] text-center max-w-full">
                     <Heading level={1} className="!text-[28px] font-[900] tracking-tight px-[10px]">{isAllSongsMode ? '전체 노래' : selectedFolder?.name}</Heading>
                     <div className="flex items-center gap-[10px]"><span className="px-[12px] py-[4px] bg-[var(--color-surface-tertiary)] rounded-full text-[12px] font-bold text-[var(--color-text-tertiary)]">총 {favoriteSongs.length}곡</span>
-                      {!isAllSongsMode && selectedFolder?.is_shared && <div className="flex items-center gap-[6px] px-[12px] py-[4px] bg-[var(--color-static-accent)] text-white rounded-full text-[11px] font-extrabold shadow-sm"><svg className="size-[12px]" fill="currentColor" viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg>SHARED</div>}
+                      {!isAllSongsMode && selectedFolder?.is_shared && (
+                        <button 
+                          onClick={() => setIsShareModalOpen(true)}
+                          className="flex items-center gap-[6px] px-[12px] py-[4px] bg-[var(--color-static-accent)] text-white rounded-full text-[11px] font-extrabold shadow-sm active:scale-95 transition-transform"
+                        >
+                          <svg className="size-[12px]" fill="currentColor" viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg>
+                          링크 공유하기
+                        </button>
+                      )}
                     </div>
                     {!isAllSongsMode && selectedFolder?.is_shared && (
                       <div className="flex -space-x-[10px] mt-[12px]">
@@ -546,7 +682,7 @@ function KaraokeAppContent() {
 
                 <div className="flex flex-col">
                   {isLoading ? <div className="flex justify-center py-[40px]"><Spinner /></div> : favoriteSongs.length > 0 ? favoriteSongs.map(song => (
-                    <SearchResultItem key={song.id} song={song} isFavorite={true} isPlaying={playingSongId === song.id} onPlay={() => setPlayingSongId(song.id)} onPause={() => setPlayingSongId(null)} onToggleFavorite={() => handleToggleFavorite(song)} />
+                    <SearchResultItem key={song.id} song={song} isFavorite={!!favMap[song.id]?.length} isPlaying={playingSongId === song.id} onPlay={() => setPlayingSongId(song.id)} onPause={() => setPlayingSongId(null)} onToggleFavorite={(s, e) => handleToggleFavorite(s, e)} />
                   )) : <div className="py-[80px] text-center bg-[var(--color-surface-tertiary)] rounded-[24px] border border-dashed border-[var(--color-border)]"><BodyText className="text-[var(--color-text-tertiary)]">폴더에 담긴 노래가 없어요.</BodyText></div>}
                 </div>
               </div>
@@ -554,11 +690,20 @@ function KaraokeAppContent() {
           </div>
         )}
       </div>
+    </div>
 
-      <FolderSelectModal memberNo={memberNo} isOpen={isFolderModalOpen} onClose={() => setIsFolderModalOpen(false)} onSelect={handleSelectFolder} onFolderCreated={loadInitialData} defaultShared={isSharedMode} />
-      {invitationFolder && <InvitationModal memberNo={memberNo} folderName={invitationFolder.name} folderId={invitationFolder.id} invitationMessage={invitationFolder.invitation_message} isOpen={!!invitationFolder} onClose={() => setInvitationFolder(null)} onJoined={async () => { const folderId = invitationFolder.id; setInvitationFolder(null); setActiveTab('favorites'); await loadInitialData(); setSelectedFolderId(folderId); }} />}
-      {selectedFolder && <ShareModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} folderId={selectedFolder.id} folderName={selectedFolder.name} shareUrl={`${window.location.origin}${window.location.pathname}?shared=${selectedFolder.share_key}`} />}
-    </main>
+    <FolderSelectModal 
+      memberNo={memberNo} 
+      isOpen={isFolderModalOpen} 
+      onClose={() => { setIsFolderModalOpen(false); setSongToFavorite(null); }} 
+      onSelect={handleSelectFolder} 
+      onFolderCreated={loadInitialData} 
+      defaultShared={isSharedMode} 
+      currentFolderIds={songToFavorite ? (favMap[songToFavorite.id] || []) : []} 
+    />
+    {invitationFolder && <InvitationModal memberNo={memberNo} folderName={invitationFolder.name} folderId={invitationFolder.id} invitationMessage={invitationFolder.invitation_message} isOpen={!!invitationFolder} onClose={() => setInvitationFolder(null)} onJoined={async () => { const folderId = invitationFolder.id; setInvitationFolder(null); setActiveTab('favorites'); await loadInitialData(); setSelectedFolderId(folderId); }} />}
+    {selectedFolder && <ShareModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} folderId={selectedFolder.id} folderName={selectedFolder.name} shareUrl={`${window.location.origin}${window.location.pathname}?shared=${selectedFolder.share_key}`} />}
+  </main>
   )
 }
 

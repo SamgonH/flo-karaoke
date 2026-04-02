@@ -18,12 +18,12 @@ interface InvitationModalProps {
 }
 
 const ANIMAL_CHARACTER_PRESETS = [
-  'https://api.dicebear.com/7.x/pixel-art/svg?seed=Panda&backgroundColor=f1f5f9',
-  'https://api.dicebear.com/7.x/pixel-art/svg?seed=Cat&backgroundColor=fef2f2',
-  'https://api.dicebear.com/7.x/pixel-art/svg?seed=Dog&backgroundColor=ecfdf5',
-  'https://api.dicebear.com/7.x/pixel-art/svg?seed=Fox&backgroundColor=fff7ed',
-  'https://api.dicebear.com/7.x/pixel-art/svg?seed=Rabbit&backgroundColor=f5f3ff',
-  'https://api.dicebear.com/7.x/pixel-art/svg?seed=Owl&backgroundColor=f0f9ff'
+  { url: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=Panda&backgroundColor=f1f5f9', name: '팬더' },
+  { url: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=Cat&backgroundColor=fef2f2', name: '야옹이' },
+  { url: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=Dog&backgroundColor=ecfdf5', name: '댕댕이' },
+  { url: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=Fox&backgroundColor=fff7ed', name: '여우' },
+  { url: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=Rabbit&backgroundColor=f5f3ff', name: '토끼' },
+  { url: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=Owl&backgroundColor=f0f9ff', name: '부엉이' }
 ]
 
 export function InvitationModal({
@@ -36,14 +36,14 @@ export function InvitationModal({
   onJoined
 }: InvitationModalProps) {
   const [nickname, setNickname] = useState('')
-  const [selectedAvatarUrl, setSelectedAvatarUrl] = useState(ANIMAL_CHARACTER_PRESETS[0])
+  const [selectedAvatarUrl, setSelectedAvatarUrl] = useState(ANIMAL_CHARACTER_PRESETS[0].url)
   const [isLoading, setIsLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   
   // 초기 아바타 설정
   useEffect(() => {
     if (isOpen) {
-      setSelectedAvatarUrl(ANIMAL_CHARACTER_PRESETS[0])
+      setSelectedAvatarUrl(ANIMAL_CHARACTER_PRESETS[0].url)
     }
   }, [isOpen])
 
@@ -72,31 +72,31 @@ export function InvitationModal({
 
     setIsLoading(true)
     try {
-      // 1. 사용자 번호 확인 (Context에서 안 넘어올 경우 대비)
       const currentMemberNo = memberNo || localStorage.getItem('KARAOKE_MEMBER_NO') || ''
       if (!currentMemberNo) {
-        alert('사용자 번호를 찾을 수 없습니다. 페이지를 새로고침 해주세요.')
-        return
+        throw new Error('사용자 세션이 만료되었습니다. 페이지를 새로고침 해주세요.')
       }
 
-      console.log('[Invitation] Processing join with memberNo:', currentMemberNo)
-
-      // 2. 프로필 업데이트
-      await updateProfile(currentMemberNo, nickname, selectedAvatarUrl)
-      console.log('[Invitation] Profile updated')
+      // 1. 프로필 업데이트 (신규 참여자일 경우 자동 생성)
+      await updateProfile(currentMemberNo, nickname.trim(), selectedAvatarUrl)
       
-      // 3. 폴더 참여
+      // 2. 폴더 참여 (방장 강등 방지 로직 포함된 joinFolder 호출)
       await joinFolder(folderId, currentMemberNo)
-      console.log('[Invitation] Join folder member success')
       
-      alert(`'${folderName}' 폴더에 참여되었습니다! 🎉`)
+      alert(`'${folderName}' 노래방에 오신 걸 환영합니다! 🎤✨`)
       onJoined()
     } catch (err: any) {
       console.error('[Invitation] Join ERROR:', err)
-      // 정확한 원인 파악을 위해 에러 상세 노출
-      alert(`참여 실패 사유: ${JSON.stringify(err.message || err)}`)
+      const errorMsg = err.message || '알 수 없는 오류가 발생했습니다.'
       
-      if (err.message?.includes('duplicate key')) {
+      if (errorMsg.includes('PGRST116') || errorMsg.includes('not found')) {
+        alert('존재하지 않거나 삭제된 폴더입니다. 😢')
+      } else {
+        alert(`참여 중 오류가 생겼어요: ${errorMsg}`)
+      }
+      
+      // 이미 멤버인 경우 오류가 나더라도 성공으로 간주하여 진입 허용
+      if (errorMsg.includes('duplicate key')) {
         onJoined()
       }
     } finally {
@@ -172,16 +172,16 @@ export function InvitationModal({
             </button>
 
             {/* Animal Presets */}
-            {ANIMAL_CHARACTER_PRESETS.map((url, idx) => (
+            {ANIMAL_CHARACTER_PRESETS.map((item, idx) => (
               <button
                 key={idx}
-                onClick={() => handleAvatarSelect(url)}
-                className={`flex flex-col items-center gap-[6px] shrink-0 transition-transform active:scale-95 ${selectedAvatarUrl === url ? 'scale-105' : 'opacity-50 grayscale hover:opacity-100 hover:grayscale-0'}`}
+                onClick={() => handleAvatarSelect(item.url)}
+                className={`flex flex-col items-center gap-[6px] shrink-0 transition-transform active:scale-95 ${selectedAvatarUrl === item.url ? 'scale-105' : 'opacity-50 grayscale hover:opacity-100 hover:grayscale-0'}`}
               >
-                <div className={`size-[60px] rounded-[22px] overflow-hidden border-[3px] transition-all ${selectedAvatarUrl === url ? 'border-[var(--color-static-accent)] shadow-lg' : 'border-transparent bg-[var(--color-surface-secondary)]'}`}>
-                  <img src={url} alt={`Pet ${idx}`} className="w-full h-full object-cover" />
+                <div className={`size-[60px] rounded-[22px] overflow-hidden border-[3px] transition-all ${selectedAvatarUrl === item.url ? 'border-[var(--color-static-accent)] shadow-lg' : 'border-transparent bg-[var(--color-surface-secondary)]'}`}>
+                  <img src={item.url} alt={item.name} className="w-full h-full object-cover" />
                 </div>
-                <DetailText className={`!text-[10px] font-bold ${selectedAvatarUrl === url ? 'text-[var(--color-static-accent)]' : 'text-transparent'}`}>PET</DetailText>
+                <DetailText className={`!text-[10px] font-bold ${selectedAvatarUrl === item.url ? 'text-[var(--color-static-accent)]' : 'text-transparent'}`}>{item.name}</DetailText>
               </button>
             ))}
           </div>
@@ -206,7 +206,12 @@ export function InvitationModal({
           <Button 
             onClick={handleJoin} 
             loading={isLoading}
-            className="w-full !rounded-[22px] !h-[60px] !text-[18px] font-black shadow-xl bg-gradient-to-r from-[var(--color-static-accent)] to-[#8E2DE2] text-white border-0 hover:brightness-110 active:scale-[0.98] transition-all"
+            disabled={!nickname.trim() || isLoading}
+            className={`w-full !rounded-[22px] !h-[60px] !text-[18px] font-black shadow-xl transition-all duration-300 ${
+              !nickname.trim() 
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-50' 
+                : 'bg-gradient-to-r from-[var(--color-static-accent)] to-[#8E2DE2] text-white hover:brightness-110 active:scale-[0.98]'
+            }`}
           >
             {isLoading ? '연결 중...' : '참여하기'}
           </Button>

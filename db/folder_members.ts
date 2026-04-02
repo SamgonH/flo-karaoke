@@ -19,7 +19,8 @@ export interface FolderMemberDetail extends FolderMemberRow {
  * 폴더의 모든 멤버 목록을 가져옵니다 (프로필 포함)
  */
 export const getFolderMembers = async (folderId: string): Promise<FolderMemberDetail[]> => {
-  const { data, error } = await (supabase.from('folder_members') as any)
+  const { data, error } = await supabase
+    .from('folder_members')
     .select(`
       *,
       profiles (
@@ -39,11 +40,27 @@ export const getFolderMembers = async (folderId: string): Promise<FolderMemberDe
  * 폴더에 새 멤버를 추가합니다 (초대 수락)
  */
 export const joinFolder = async (folderId: string, memberNo: string): Promise<void> => {
-  const { error } = await (supabase.from('folder_members') as any)
+  // 1. 이미 멤버인지, 그리고 권한이 무엇인지 확인
+  const { data: existingMember } = await supabase
+    .from('folder_members')
+    .select('role')
+    .eq('folder_id', folderId)
+    .eq('member_no', memberNo)
+    .maybeSingle()
+
+  // 2. 방장(OWNER)인 경우 절대로 강등시키지 않음
+  if (existingMember?.role === 'OWNER') {
+    console.log('[joinFolder] Already owner, skipping role overwrite.')
+    return
+  }
+
+  // 3. 멤버가 아니거나 회원인 경우 MEMBER로 가입/갱신
+  const { error } = await supabase
+    .from('folder_members')
     .upsert({ 
       folder_id: folderId, 
       member_no: memberNo,
-      role: 'MEMBER' // 초대로 들어오는 사람은 항상 팀원
+      role: 'MEMBER' 
     }, { onConflict: 'folder_id,member_no' })
 
   if (error) throw error
@@ -53,7 +70,8 @@ export const joinFolder = async (folderId: string, memberNo: string): Promise<vo
  * 특정 사용자가 방장인지 확인합니다
  */
 export const checkIsOwner = async (folderId: string, memberNo: string): Promise<boolean> => {
-  const { data, error } = await (supabase.from('folder_members') as any)
+  const { data, error } = await supabase
+    .from('folder_members')
     .select('role')
     .eq('folder_id', folderId)
     .eq('member_no', memberNo)

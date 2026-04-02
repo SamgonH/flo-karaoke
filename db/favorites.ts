@@ -61,14 +61,14 @@ export const addFavoriteSong = async (folderId: string, songId: string, memberNo
 }
 
 /**
- * 즐겨찾기에서 곡을 삭제합니다.
- * @param favoriteId 즐겨찾기 ID
+ * 즐겨찾기에서 특정 폴더의 곡을 삭제합니다.
  */
-export const removeFavoriteSong = async (favoriteId: string): Promise<void> => {
+export const removeFavoriteSongByFolder = async (folderId: string, songId: string): Promise<void> => {
   const { error } = await supabase
     .from('favorite_songs')
     .delete()
-    .eq('id', favoriteId)
+    .eq('folder_id', folderId)
+    .eq('song_id', songId)
 
   if (error) {
     console.error('즐겨찾기 삭제 실패:', error)
@@ -77,21 +77,18 @@ export const removeFavoriteSong = async (favoriteId: string): Promise<void> => {
 }
 
 /**
- * 어떤 폴더에 해당 곡이 이미 들어있는지 확인합니다.
- * @param songId 곡 ID
- * @param memberNo FLO 사용자 번호
+ * 곡이 담긴 모든 폴더 ID를 가져옵니다.
  */
-export const checkIsFavorite = async (songId: string, memberNo: string): Promise<FavoriteSongRow | null> => {
+export const getFavoriteFolderIdsBySong = async (songId: string, memberNo: string): Promise<string[]> => {
   const { data, error } = await supabase
     .from('favorite_songs')
-    .select('*')
+    .select('folder_id')
     .eq('song_id', songId)
     .eq('member_no', memberNo)
-    .maybeSingle()
 
   if (error) {
-    console.error('즐겨찾기 확인 실패:', error)
-    return null
+    console.error('즐겨찾기 폴더 조회 실패:', error)
+    return []
   }
-  return data
+  return data.map(d => d.folder_id).filter((id): id is string => !!id)
 }

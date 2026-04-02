@@ -33,19 +33,40 @@ export function ShareModal({
 
   if (!isOpen) return null
 
-  const handleShare = async (appName: string) => {
+  const handleShare = async () => {
     try {
       // 1. DB에 문구 저장
       await updateInvitationMessage(folderId, message)
       
-      // 2. 클립보드 복사 (실제 SNS 연동 전 폴백)
-      await navigator.clipboard.writeText(`${message}\n\n초대 링크: ${shareUrl}`)
-      
-      alert(`'${appName}'(으)로 초대 문구가 저장 및 복사되었습니다! 🎉`)
+      const shareData = {
+        title: `'${folderName}' 노래방 초대`,
+        text: message,
+        url: shareUrl
+      }
+
+      // 2. 네이티브 공유 API 시도 (모바일 등 브라우저 지원 시)
+      if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+        await navigator.share(shareData)
+      } else {
+        // 3. 지원하지 않을 경우 클립보드 복사 폴백
+        await navigator.clipboard.writeText(`${message}\n\n초대 링크: ${shareUrl}`)
+        alert('초대 링크가 복사되었습니다! 원하는 곳에 붙여넣어 주세요. 📋')
+      }
       onClose()
     } catch (err) {
-      console.error('초대 메시지 저장 실패:', err)
-      alert('초대 메시지 저장 중 오류가 발생했습니다.')
+      console.error('공유 실패:', err)
+      if (err instanceof Error && err.name !== 'AbortError') {
+        alert('공유 중 오류가 발생했습니다.')
+      }
+    }
+  }
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      alert('링크만 깔끔하게 복사되었습니다! 🔗')
+    } catch (err) {
+      alert('링크 복사에 실패했습니다.')
     }
   }
 
@@ -61,45 +82,33 @@ export function ShareModal({
         </div>
 
         {/* Message Input Area */}
-        <div className="flex flex-col gap-[10px]">
+        <div className="flex flex-col gap-[12px]">
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            className="w-full h-[100px] bg-[var(--color-surface-secondary)] border-2 border-[var(--color-border)] rounded-[20px] p-[16px] text-[15px] resize-none focus:outline-none focus:border-[var(--color-static-accent)] transition-all"
-            placeholder="메시지를 입력하세요..."
+            className="w-full h-[120px] bg-[var(--color-surface-secondary)] border-2 border-[var(--color-border)] rounded-[24px] p-[20px] text-[15px] font-medium resize-none focus:outline-none focus:border-[var(--color-static-accent)] focus:bg-white transition-all shadow-inner"
+            placeholder="친구에게 보낼 따뜻한 메시지를 입력하세요..."
           />
-          <div className="p-[12px] bg-[var(--color-surface-tertiary)] rounded-[14px] border border-[var(--color-border)]">
-            <DetailText className="truncate text-[var(--color-text-tertiary)] select-none">
-              🔗 {shareUrl}
-            </DetailText>
-          </div>
         </div>
 
-        {/* Share Apps Horizontal Scroll */}
-        <div className="flex flex-col gap-[12px]">
-          <BodyText className="font-bold text-[14px] pl-[4px]">공유할 앱 선택</BodyText>
-          <div className="flex gap-[16px] overflow-x-auto scrollbar-hide py-[8px] -mx-[4px] px-[4px]">
-            {SHARE_APPS.map((app) => (
-              <button
-                key={app.id}
-                onClick={() => handleShare(app.name)}
-                className="flex flex-col items-center gap-[8px] shrink-0 active:scale-90 transition-transform"
-              >
-                <div 
-                  className="size-[56px] rounded-[18px] flex items-center justify-center text-[24px] shadow-sm"
-                  style={{ backgroundColor: app.bgColor }}
-                >
-                  {app.icon}
-                </div>
-                <DetailText className="!text-[12px] font-medium text-[var(--color-text-secondary)]">{app.name}</DetailText>
-              </button>
-            ))}
-          </div>
+        {/* Action Buttons */}
+        <div className="flex flex-col gap-[12px] mt-[10px]">
+          <button 
+            onClick={handleShare} 
+            className="w-full h-[60px] rounded-[22px] text-[18px] font-extrabold shadow-xl bg-gradient-to-r from-[var(--color-static-accent)] to-[#8E2DE2] text-white hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-[8px]"
+          >
+            <svg className="size-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+            초대하기
+          </button>
+          <button 
+            onClick={onClose}
+            className="w-full py-[8px] text-[14px] text-[var(--color-text-tertiary)] font-bold hover:text-[var(--color-text-primary)] transition-colors"
+          >
+            취소
+          </button>
         </div>
-
-        <Button onClick={() => handleShare('전체')} className="w-full !h-[56px] !rounded-[18px] !text-[17px] font-bold">
-          초대 메시지 보내기
-        </Button>
       </Card>
     </div>
   )

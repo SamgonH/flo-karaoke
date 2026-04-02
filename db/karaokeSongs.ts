@@ -11,13 +11,22 @@ export const searchKaraokeSongs = async (query: string): Promise<KaraokeSongRow[
   if (!query.trim()) return []
 
   const safeQuery = query.trim()
+  const strippedQuery = safeQuery.replace(/\s+/g, '')
+
+  // 띄어쓰기 무시 및 원본 매칭 동시 수행 (FLO 스타일 검색 엔진)
+  const orFilter = [
+    `title.ilike.%${safeQuery}%`,
+    `artist.ilike.%${safeQuery}%`,
+    `search_keywords.ilike.%${safeQuery}%`,
+    `title.ilike.%${strippedQuery}%`,
+    `search_keywords.ilike.%${strippedQuery}%`
+  ].join(',')
 
   const { data, error } = await supabase
     .from('karaoke_songs')
     .select('*')
-    // 제목, 아티스트, 또는 검색용 키워드 칼럼에서 부분 일치 검색
-    .or(`title.ilike.%${safeQuery}%,artist.ilike.%${safeQuery}%,search_keywords.ilike.%${safeQuery}%`)
-    // 최근에 추가된 것부터, 혹은 인기 있는 순으로 가져올 수 있지만 일단 등록순으로 정렬
+    .or(orFilter)
+    .order('favorite_count', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(50)
 
