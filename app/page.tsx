@@ -8,6 +8,7 @@ import { SearchResultItem, type Song } from '@/components/SearchResultItem'
 import { FolderSelectModal } from '@/components/FolderSelectModal'
 import { InvitationModal } from '@/components/InvitationModal'
 import { ShareModal } from '@/components/ShareModal'
+import { QRScannerModal } from '@/components/QRScannerModal'
 import { 
   getFolders, 
   getFolderByShareKey, 
@@ -44,6 +45,7 @@ function KaraokeAppContent() {
 
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false)
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
+  const [isQRScannerOpen, setIsQRScannerOpen] = useState(false)
   const [isSharedMode, setIsSharedMode] = useState(false)
   const [songToFavorite, setSongToFavorite] = useState<Song | null>(null)
   const [invitationFolder, setInvitationFolder] = useState<any | null>(null)
@@ -437,7 +439,7 @@ function KaraokeAppContent() {
                 type="text" 
                 value={searchQuery} 
                 onChange={(e) => setSearchQuery(e.target.value)} 
-                placeholder="곡명, 아티스트를 한글로 검색" 
+                placeholder="곡명, 아티스트를 검색" 
                 className="relative w-full h-[64px] bg-white/80 backdrop-blur-3xl border border-white/40 rounded-[24px] px-[28px] text-[18px] font-medium shadow-2xl focus:outline-none focus:border-[var(--color-static-accent)] transition-all placeholder:text-[var(--color-text-tertiary)]" 
               />
               <button type="submit" className="absolute right-[12px] top-[12px] size-[40px] bg-[var(--color-static-accent)] rounded-[16px] text-white flex items-center justify-center shadow-lg active:scale-95 transition-transform">
@@ -661,6 +663,21 @@ function KaraokeAppContent() {
                         {folderMembers.map((member) => <img key={member.id} src={member.profiles?.avatar_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${member.member_no}`} alt={member.profiles?.nickname} className="size-[32px] rounded-[10px] border-2 border-white shadow-md object-cover" />)}
                       </div>
                     )}
+                    {!isAllSongsMode && (
+                      <div className="flex flex-col items-center mt-[32px] mb-[8px] w-full max-w-[340px] px-[10px]">
+                        <button 
+                          onClick={() => setIsQRScannerOpen(true)}
+                          className="w-full h-[64px] rounded-[24px] bg-gradient-to-r from-[#1A1A1A] to-[#333333] text-white font-extrabold text-[18px] shadow-2xl shadow-black/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-[12px] group relative overflow-hidden"
+                        >
+                          <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <svg className="size-[24px] text-[var(--color-static-accent)] animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" /></svg>
+                          한꺼번에 예약하기! 🚀
+                        </button>
+                        <span className="mt-[12px] text-[12px] font-bold text-[var(--color-text-tertiary)] bg-white/60 backdrop-blur-xl px-[16px] py-[6px] rounded-full shadow-sm">
+                          노래방 기기에 표시된 QR 코드를 비춰주세요! 📸
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -703,6 +720,7 @@ function KaraokeAppContent() {
     />
     {invitationFolder && <InvitationModal memberNo={memberNo} folderName={invitationFolder.name} folderId={invitationFolder.id} invitationMessage={invitationFolder.invitation_message} isOpen={!!invitationFolder} onClose={() => setInvitationFolder(null)} onJoined={async () => { const folderId = invitationFolder.id; setInvitationFolder(null); setActiveTab('favorites'); await loadInitialData(); setSelectedFolderId(folderId); }} />}
     {selectedFolder && <ShareModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} folderId={selectedFolder.id} folderName={selectedFolder.name} shareUrl={`${window.location.origin}${window.location.pathname}?shared=${selectedFolder.share_key}`} />}
+    <QRScannerModal isOpen={isQRScannerOpen} onClose={() => setIsQRScannerOpen(false)} />
   </main>
   )
 }
