@@ -107,6 +107,13 @@ export function SearchResultItem({
         <DetailText className="truncate mt-[4px]" color="text-[var(--color-text-secondary)]">
           {song.artist}
         </DetailText>
+        <button 
+          onClick={(e) => { e.stopPropagation(); alert('🎥 FLO 가왕 영상 재생 기능은 준비 중입니다!'); }}
+          className="mt-[8px] self-start flex items-center gap-[6px] px-[10px] py-[4px] rounded-full bg-[var(--color-surface-secondary)] border border-[var(--color-border)] hover:bg-[var(--color-surface-tertiary)] active:scale-95 transition-all group"
+        >
+          <svg className="size-[14px] text-[var(--color-static-accent)] group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 24 24"><path d="M18 4v1h-2V4c0-.55-.45-1-1-1H9c-.55 0-1 .45-1 1v1H6V4c0-.55-.45-1-1-1s-1 .45-1 1v16c0 .55.45 1 1 1s1-.45 1-1v-1h2v1c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-1h2v1c0 .55.45 1 1 1s1-.45 1-1V4c0-.55-.45-1-1-1s-1 .45-1 1zM8 17H6v-2h2v2zm0-4H6v-2h2v2zm0-4H6V7h2v2zm10 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2z" /></svg>
+          <span className="text-[11px] font-[900] tracking-tight text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)]">FLO 가왕 버전 듣기</span>
+        </button>
       </div>
 
       {/* 노래방 번호 및 즐겨찾기 */}

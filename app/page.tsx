@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, Suspense, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Heading, BodyText, DetailText } from '@/components/ui/Text'
 import { Spinner } from '@/components/ui/Spinner'
@@ -26,7 +26,15 @@ import { getFolderMembers } from '@/db/folder_members'
 import { incrementSongStat, getPopularSongs, searchKaraokeSongs } from '@/db/karaokeSongs'
 import { logAction } from '@/utils/floLog'
 
-type RankingCategory = 'ALL' | 'K-POP' | 'POP' | 'J-POP' | 'C-POP'
+const MOCK_FLO_KINGS = [
+  { id: '1', name: '홍대 감성남', song: '다이너마이트', views: '1.2M', likes: '12만', img: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=200&auto=format&fit=crop', videoTime: '1:02', badge: '🔥 급상승' },
+  { id: '2', name: '코인노래방 고인물', song: 'Tears', views: '980K', likes: '9.8만', img: 'https://images.unsplash.com/photo-1516280440502-601ce838202d?q=80&w=200&auto=format&fit=crop', videoTime: '0:58', badge: '👑 1위' },
+  { id: '3', name: '방구석 디바', song: '사건의 지평선', views: '850K', likes: '6.5만', img: 'https://images.unsplash.com/photo-1521337581100-8ca9a73a5f79?q=80&w=200&auto=format&fit=crop', videoTime: '1:15', badge: '✨ NEW' },
+  { id: '4', name: '출근길 스웨거', song: 'Hype Boy', views: '640K', likes: '5.1만', img: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?q=80&w=200&auto=format&fit=crop', videoTime: '0:45', badge: '📈 인기' },
+  { id: '5', name: '노래하는 야옹이', song: '에필로그', views: '520K', likes: '4.8만', img: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=Cat', videoTime: '1:30', badge: '🥺 감동' },
+]
+
+type RankingCategory = 'ALL' | 'K-POP' | 'POP' | 'J-POP' | 'C-POP' | 'FLO 가왕'
 
 function KaraokeAppContent() {
   const searchParams = useSearchParams()
@@ -42,6 +50,7 @@ function KaraokeAppContent() {
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
   const [folderMembers, setFolderMembers] = useState<any[]>([])
   const [playingSongId, setPlayingSongId] = useState<string | null>(null)
+  const touchStartY = useRef<number | null>(null)
 
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false)
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
@@ -58,8 +67,10 @@ function KaraokeAppContent() {
 
   const [showIntro, setShowIntro] = useState(true)
   const [introStep, setIntroStep] = useState(0) // 0: '나의', 1: (🎤), 2: '노래방'
+  const [isReelsMode, setIsReelsMode] = useState(false)
 
   useEffect(() => {
+    window.scrollTo(0, 0)
     let id = localStorage.getItem('KARAOKE_MEMBER_NO')
     if (!id) {
       id = `guest-${Math.random().toString(36).substring(2, 9)}`
@@ -398,8 +409,58 @@ function KaraokeAppContent() {
 
   const selectedFolder = folders.find(f => f.id === selectedFolderId)
 
+  const isInitialSearch = activeTab === 'search' && searchResults.length === 0 && !isLoading && !searchQuery;
+
+  useEffect(() => {
+    // 인트로 중이거나 이미 릴스 모드이거나 검색초기화면이 아니면 동작 제한
+    if (showIntro || !isInitialSearch || isReelsMode) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.deltaY > 0) { // 약간의 휠 내림(아래로 스크롤)만 있어도 즉시 릴스로 넘어감
+        setIsReelsMode(true);
+      }
+    };
+    
+    let touchStartY = 0;
+    const handleTouchStart = (e: TouchEvent) => {
+       touchStartY = e.touches[0].clientY;
+    };
+    const handleTouchMove = (e: TouchEvent) => {
+       if (touchStartY && touchStartY - e.touches[0].clientY > 15) { // 15px 살짝만 쓸어올려도 반응
+          setIsReelsMode(true);
+       }
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: true });
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+
+    return () => {
+      window.removeEventListener('wheel', handleWheel);
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleTouchMove);
+    };
+  }, [isInitialSearch, isReelsMode, showIntro]);
+
   return (
-    <main className="min-h-screen bg-[var(--color-surface-bg)] text-[var(--color-text-primary)] pb-[100px] overflow-x-hidden">
+    <main 
+      className={`bg-[var(--color-surface-bg)] text-[var(--color-text-primary)] overflow-x-hidden transition-all duration-300 ${isInitialSearch ? 'h-[100dvh] overflow-y-hidden' : 'min-h-screen pb-[100px]'}`}
+      onWheel={(e) => {
+        if (!showIntro && isInitialSearch && e.deltaY > 0) setIsReelsMode(true);
+      }}
+      onTouchStart={(e) => {
+        if (!showIntro && isInitialSearch) touchStartY.current = e.touches[0].clientY;
+      }}
+      onTouchMove={(e) => {
+        if (!showIntro && isInitialSearch && touchStartY.current !== null) {
+          if (touchStartY.current - e.touches[0].clientY > 15) {
+            setIsReelsMode(true);
+            touchStartY.current = null;
+          }
+        }
+      }}
+      onTouchEnd={() => { touchStartY.current = null; }}
+    >
       {/* Intro Landing Overlay */}
       {showIntro && (
         <div className="fixed inset-0 z-[200] bg-[var(--color-surface-bg)] flex items-center justify-center overflow-hidden">
@@ -502,13 +563,38 @@ function KaraokeAppContent() {
                     {isLoading ? <div className="flex justify-center py-[40px]"><Spinner /></div> : searchResults.map(song => (
                       <SearchResultItem key={song.id} song={song} isFavorite={!!favMap[song.id]?.length} isPlaying={playingSongId === song.id} onPlay={() => setPlayingSongId(song.id)} onPause={() => setPlayingSongId(null)} onToggleFavorite={(s, e) => handleToggleFavorite(s, e)} />
                     ))}
+                    
+                    {/* 플로팅 버튼 (검색 결과가 있을 때만 활성화) */}
+                    <button 
+                      onClick={() => { setSearchQuery(''); setIsReelsMode(true); }}
+                      className="fixed bottom-[30px] left-1/2 transform -translate-x-1/2 z-[100] flex items-center gap-[10px] px-[28px] py-[16px] bg-gradient-to-r from-black to-[#222] text-white rounded-full shadow-[0_15px_30px_rgba(0,0,0,0.5)] border border-white/20 hover:scale-[1.03] active:scale-95 transition-all outline outline-4 outline-white/10"
+                    >
+                      <svg className="size-[18px] text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg>
+                      <span className="font-extrabold text-[16px] tracking-tight">FLO 가왕 릴스 보기</span>
+                    </button>
                   </>
                 ) : !isLoading && (
-                  <div className="py-[100px] flex flex-col items-center gap-[16px] bg-white/20 backdrop-blur-xl rounded-[40px] border border-white/40 text-center px-[20px]">
-                    <div className="text-[48px] animate-bounce">🔍</div>
-                    <div className="flex flex-col gap-[4px]">
-                      <BodyText className="font-bold !text-[20px]">찾으시는 곡이 없나요?</BodyText>
-                      <DetailText className="text-[var(--color-text-tertiary)] max-w-[200px]">데이터를 더 수집 중이니 조금만 기다려주세요!</DetailText>
+                  <div 
+                    className="flex flex-col items-center justify-center p-[40px] mt-[20px] rounded-[32px] cursor-pointer group active:scale-[0.98] transition-transform w-full relative overflow-hidden shadow-sm hover:shadow-lg border border-[var(--color-border)] hover:border-[var(--color-static-accent)] bg-gradient-to-b from-white to-[var(--color-surface-secondary)]"
+                    onClick={() => setIsReelsMode(true)}
+                  >
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03] pointer-events-none" />
+                    
+                    <div className="relative mb-[24px]">
+                      <div className="absolute inset-0 bg-[var(--color-static-accent)] blur-[40px] opacity-20 rounded-full group-hover:opacity-40 transition-opacity" />
+                      <svg className="relative size-[90px] text-[var(--color-static-accent)] drop-shadow-[0_10px_20px_rgba(0,0,0,0.2)] group-hover:-translate-y-2 transition-transform duration-300" fill="currentColor" viewBox="0 0 24 24"><path d="M18 4v1h-2V4c0-.55-.45-1-1-1H9c-.55 0-1 .45-1 1v1H6V4c0-.55-.45-1-1-1s-1 .45-1 1v16c0 .55.45 1 1 1s1-.45 1-1v-1h2v1c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-1h2v1c0 .55.45 1 1 1s1-.45 1-1V4c0-.55-.45-1-1-1s-1 .45-1 1zM8 17H6v-2h2v2zm0-4H6v-2h2v2zm0-4H6V7h2v2zm10 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2z" /></svg>
+                    </div>
+                    
+                    <Heading level={1} className="!text-[46px] font-[900] tracking-tighter text-[var(--color-text-primary)] mb-[8px] drop-shadow-sm flex items-center gap-[4px]">
+                      FLO <span className="text-[var(--color-static-accent)]">가왕</span>
+                    </Heading>
+                    <BodyText className="text-[17px] font-bold text-[var(--color-text-tertiary)] mb-[32px]">오리지널 커버 숏폼 피드</BodyText>
+
+                    <div className="flex flex-col items-center gap-[12px] opacity-80 animate-bounce cursor-pointer group-hover:text-[var(--color-static-accent)] transition-colors">
+                      <span className="text-[14px] font-black tracking-widest text-[var(--color-text-secondary)] group-hover:text-[var(--color-static-accent)]">클릭하거나 아래로 스크롤</span>
+                      <div className="p-[12px] rounded-full bg-white shadow-xl border border-[var(--color-border)] group-hover:border-[var(--color-static-accent)] group-hover:scale-110 transition-all text-[var(--color-text-tertiary)] group-hover:text-[var(--color-static-accent)] group-hover:shadow-[0_10px_20px_rgba(var(--color-static-accent-rgb),0.2)]">
+                        <svg className="size-[28px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -518,9 +604,10 @@ function KaraokeAppContent() {
           {activeTab === 'rank' && (
             <div className="flex flex-col gap-[20px] animate-in fade-in slide-in-from-bottom-4">
               {/* Category Subtabs */}
-              <div className="flex gap-[10px] overflow-x-auto scrollbar-hide pb-[4px]">
-                {(['ALL', 'K-POP', 'POP', 'J-POP', 'C-POP'] as RankingCategory[]).map(cat => (
-                  <button key={cat} onClick={() => setRankingCategory(cat)} className={`shrink-0 px-[18px] py-[10px] rounded-[18px] text-[13px] font-black border transition-all ${rankingCategory === cat ? 'bg-white text-[var(--color-text-primary)] border-white shadow-xl scale-105' : 'bg-transparent text-[var(--color-text-tertiary)] border-transparent opacity-60 hover:opacity-100'}`}>
+              <div className="flex gap-[10px] overflow-x-auto scrollbar-hide pb-[8px] px-[4px]">
+                {(['ALL', 'K-POP', 'POP', 'J-POP', 'C-POP', 'FLO 가왕'] as RankingCategory[]).map(cat => (
+                  <button key={cat} onClick={() => setRankingCategory(cat)} className={`shrink-0 flex items-center gap-[4px] px-[16px] py-[10px] rounded-[18px] text-[13px] font-black border transition-all ${rankingCategory === cat ? (cat === 'FLO 가왕' ? 'bg-black text-white border-black shadow-xl scale-105' : 'bg-white text-[var(--color-text-primary)] border-white shadow-xl scale-105') : 'bg-white/40 backdrop-blur-md text-[var(--color-text-secondary)] border-white/50 hover:bg-white/60'}`}>
+                    {cat === 'FLO 가왕' && <span className="text-yellow-400">👑</span>}
                     {cat === 'ALL' ? '전체' : cat}
                   </button>
                 ))}
@@ -721,6 +808,72 @@ function KaraokeAppContent() {
     {invitationFolder && <InvitationModal memberNo={memberNo} folderName={invitationFolder.name} folderId={invitationFolder.id} invitationMessage={invitationFolder.invitation_message} isOpen={!!invitationFolder} onClose={() => setInvitationFolder(null)} onJoined={async () => { const folderId = invitationFolder.id; setInvitationFolder(null); setActiveTab('favorites'); await loadInitialData(); setSelectedFolderId(folderId); }} />}
     {selectedFolder && <ShareModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} folderId={selectedFolder.id} folderName={selectedFolder.name} shareUrl={`${window.location.origin}${window.location.pathname}?shared=${selectedFolder.share_key}`} />}
     <QRScannerModal isOpen={isQRScannerOpen} onClose={() => setIsQRScannerOpen(false)} />
+
+    {/* 전면 풀스크린 릴스 모달 오버레이 */}
+    {isReelsMode && (
+      <div className="fixed inset-0 z-[500] bg-black flex flex-col animate-in slide-in-from-bottom-full duration-500 ease-in-out">
+        {/* 상단 닫기 바 */}
+        <div className="absolute top-0 left-0 right-0 h-[80px] bg-gradient-to-b from-black/80 to-transparent z-[510] flex items-center px-[20px]">
+          <button 
+            onClick={() => setIsReelsMode(false)}
+            className="size-[44px] rounded-full bg-black/40 backdrop-blur-xl flex items-center justify-center border border-white/20 active:scale-95 transition-all text-white hover:bg-white/10"
+          >
+            <svg className="size-[24px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+          </button>
+          <span className="ml-[16px] text-white font-[900] text-[20px] tracking-tight">FLO 가왕 피드</span>
+        </div>
+
+        {/* 세로 영상 스와이프 컨테이너 */}
+        <div className="w-full h-[100dvh] overflow-y-auto snap-y snap-mandatory scrollbar-hide">
+          {MOCK_FLO_KINGS.map((king, i) => (
+            <div key={king.id} className="relative w-full h-[100dvh] shrink-0 snap-start bg-black overflow-hidden group">
+              <img src={king.img} alt={king.name} className="absolute inset-0 w-full h-full object-cover opacity-80 scale-[1.02] group-hover:scale-100 transition-transform duration-1000" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-black/50" />
+              
+              {/* 툴바 UI (우측) */}
+              <div className="absolute right-[20px] bottom-[140px] flex flex-col gap-[24px] z-20 items-center">
+                <button className="flex flex-col items-center gap-[6px] group/btn">
+                  <div className="size-[52px] rounded-full bg-black/40 backdrop-blur-xl flex items-center justify-center group-hover/btn:bg-black/60 transition-all border border-white/20 shadow-xl group-active/btn:scale-95 text-pink-500">
+                    <svg className="size-[26px]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" /></svg>
+                  </div>
+                  <span className="text-white font-bold text-[12px] drop-shadow-md">{king.likes}</span>
+                </button>
+                <button className="flex flex-col items-center gap-[6px] group/btn">
+                  <div className="size-[52px] rounded-full bg-black/40 backdrop-blur-xl flex items-center justify-center group-hover/btn:bg-black/60 transition-all border border-white/20 shadow-xl group-active/btn:scale-95 text-white">
+                    <svg className="size-[26px]" fill="currentColor" viewBox="0 0 24 24"><path d="M21.99 4c0-1.1-.89-2-1.99-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4-.01-18z" /></svg>
+                  </div>
+                  <span className="text-white font-bold text-[12px] drop-shadow-md">3.2천</span>
+                </button>
+                <button className="flex flex-col items-center gap-[6px] group/btn">
+                  <div className="size-[52px] rounded-full bg-black/40 backdrop-blur-xl flex items-center justify-center group-hover/btn:bg-black/60 transition-all border border-white/20 shadow-xl group-active/btn:scale-95 text-white">
+                    <svg className="size-[24px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                  </div>
+                  <span className="text-white font-bold text-[12px] drop-shadow-md">공유</span>
+                </button>
+              </div>
+
+              {/* 하단 메타 데이터 */}
+              <div className="absolute bottom-[40px] left-[20px] right-[100px] flex flex-col gap-[8px] z-10">
+                <div className="flex items-center gap-[8px] mb-[4px]">
+                  <span className="px-[14px] py-[6px] bg-gradient-to-r from-pink-500 to-purple-600 rounded-full text-[12px] font-black text-white shadow-lg border border-white/20">{king.badge}</span>
+                  <div className="flex items-center gap-[6px] bg-black/50 px-[12px] py-[6px] rounded-full backdrop-blur-md border border-white/10">
+                    <svg className="size-[14px] text-white/90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                    <span className="text-[12px] font-bold text-white/90">{king.views}</span>
+                  </div>
+                </div>
+                <Heading level={2} className="!text-[36px] font-[900] text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)] leading-tight">{king.song}</Heading>
+                <div className="flex items-center gap-[8px] mt-[4px]">
+                  <div className="size-[32px] rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white border border-white/30 text-[14px]">🎧</div>
+                  <DetailText className="!text-[18px] font-bold text-white/90 drop-shadow-lg">@{king.name}</DetailText>
+                </div>
+                <DetailText className="!text-[14px] font-medium text-white/70 drop-shadow-md truncate mt-[8px]">🎶 오리지널 사운드 - {king.name} 커버 직캠 모음집</DetailText>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+
   </main>
   )
 }
